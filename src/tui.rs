@@ -173,19 +173,33 @@ fn run_tui_loop(
                         ]);
 
                         let summary_text = item.summary.as_deref().unwrap_or("Fetching summary...");
-                        let summary_truncated: String = summary_text.chars().take(60).collect();
                         let relative_time = format_relative_time(item.updated_at);
 
-                        let line2 = Line::from(vec![
+                        let meta_line = Line::from(vec![
                             Span::raw("  "),
-                            Span::styled(summary_truncated, Style::default().fg(Color::DarkGray)),
-                            Span::raw(" • "),
                             Span::styled(&item.author, Style::default().fg(Color::DarkGray)),
                             Span::raw(" • "),
                             Span::styled(relative_time, Style::default().fg(Color::DarkGray)),
                         ]);
 
-                        ListItem::new(vec![line1, line2, Line::raw("")])
+                        // Wrap summary across as many lines as needed
+                        let summary_style = Style::default().fg(Color::DarkGray);
+                        let summary_lines: Vec<Line> =
+                            wrap_text(summary_text, area.width.saturating_sub(4) as usize)
+                                .into_iter()
+                                .map(|s| {
+                                    Line::from(vec![
+                                        Span::raw("  "),
+                                        Span::styled(s, summary_style),
+                                    ])
+                                })
+                                .collect();
+
+                        let mut lines = vec![line1, meta_line];
+                        lines.extend(summary_lines);
+                        lines.push(Line::raw(""));
+
+                        ListItem::new(lines)
                     })
                     .collect();
 
@@ -193,7 +207,7 @@ fn run_tui_loop(
                     .block(Block::default().borders(Borders::TOP))
                     .highlight_style(
                         Style::default()
-                            .bg(Color::DarkGray)
+                            .bg(Color::Indexed(236))
                             .add_modifier(Modifier::BOLD),
                     );
 
@@ -275,6 +289,28 @@ fn run_tui_loop(
     }
 
     Ok(())
+}
+
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![text.to_string()];
+    }
+    let mut lines = Vec::new();
+    let mut remaining = text;
+    while !remaining.is_empty() {
+        if remaining.len() <= width {
+            lines.push(remaining.to_string());
+            break;
+        }
+        // Try to break at a space
+        let break_at = remaining[..width].rfind(' ').unwrap_or(width);
+        lines.push(remaining[..break_at].to_string());
+        remaining = remaining[break_at..].trim_start();
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }
 
 fn format_relative_time(dt: chrono::DateTime<Utc>) -> String {
