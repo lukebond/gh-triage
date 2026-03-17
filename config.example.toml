@@ -1,0 +1,39 @@
+# gh-triage configuration
+# Copy to ~/.config/gh-triage/config.toml and edit to suit.
+
+# GitHub personal access token. Needs repo scope.
+# Can also be set via the GH_TOKEN environment variable.
+github_token = "ghp_your_token_here"
+
+# Your GitHub username
+github_user = "your-username"
+
+# The organisation to monitor
+github_org = "your-org"
+
+# Poll interval in seconds
+poll_interval = 120
+
+# What "enter" does in the TUI: "browser" or "preview"
+enter_action = "browser"
+
+# notify-send urgency: "low", "normal", "critical"
+notify_urgency = "normal"
+
+# When to notify:
+#   "new_item"     — only when an item is first seen
+#   "new_activity"  — any time a tracked item is updated
+notify_on = "new_activity"
+
+# Repos where you want to see *everything* (all issues and PRs).
+# Most users leave this empty or add 1-2 high-priority repos.
+[repos.all]
+repos = [
+    # "your-org/important-repo",
+]
+
+# Repos to ignore completely.
+[repos.ignore]
+repos = [
+    # "your-org/archived-repo",
+]
