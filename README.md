@@ -58,13 +58,15 @@ github_org = "your-org"
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
 | `Enter` | Open in browser |
-| `a` | Archive item |
+| `a` | Archive item (re-appears if new activity occurs) |
 | `A` | Toggle archived view |
 | `Tab` | Toggle latest / by-repo view |
 | `R` | Refresh |
 | `q` | Quit |
 
-Items show a `●` indicator when unseen in the current session. Colour coding: yellow = review requested, cyan = assigned, white = mentioned.
+Items show a `●` indicator when unseen in the current session. Colour coding: yellow = review requested, cyan = assigned, white = mentioned. Press `?` for a keybindings popup.
+
+Archiving an item hides it from the active list. If new activity is detected on an archived item (e.g. a new comment), it automatically returns to the active list.
 
 ## AI summaries
 

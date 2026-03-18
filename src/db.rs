@@ -122,7 +122,7 @@ impl Db {
                 let new_updated = item.updated_at.to_rfc3339();
                 if existing_updated != new_updated {
                     self.conn.execute(
-                        "UPDATE items SET title = ?1, body = ?2, state = ?3, updated_at = ?4, last_activity_at = ?5, reason = ?6 WHERE id = ?7",
+                        "UPDATE items SET title = ?1, body = ?2, state = ?3, updated_at = ?4, last_activity_at = ?5, reason = ?6, status = 'active' WHERE id = ?7",
                         params![
                             item.title,
                             item.body,
