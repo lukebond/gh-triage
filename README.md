@@ -109,6 +109,8 @@ echo "$(gh-triage waybar 2>/dev/null | jq -r '.tooltip // empty')"
 
 Either line will silently do nothing if the database doesn't exist yet or the config isn't set up.
 
+> This one-liner is useful to add to your `.bashrc` (exclude the echo and outer parentheses) for a dose of notification doom on each new terminal opened.
+
 ## Data locations
 
 | Path | Purpose |
