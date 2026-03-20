@@ -17,6 +17,7 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
     let results = client.poll(config, last_poll).await?;
     let mut new_count = 0;
     let mut updated_count = 0;
+    let is_first_poll = last_poll.is_none();
 
     // Collect items that need summaries
     let mut needs_summary: Vec<(String, String, String, String)> = Vec::new();
@@ -25,7 +26,9 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
         let (inserted, updated) = db.upsert_item(item)?;
         if inserted {
             new_count += 1;
-            send_notification(&config.notify_urgency, &item.repo, &item.title);
+            if !is_first_poll {
+                send_notification(&config.notify_urgency, &item.repo, &item.title);
+            }
             // Queue summary generation
             let body = item.body.clone().unwrap_or_default();
             needs_summary.push((
@@ -36,7 +39,9 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
             ));
         } else if updated && config.notify_on == NotifyOn::NewActivity {
             updated_count += 1;
-            send_notification(&config.notify_urgency, &item.repo, &item.title);
+            if !is_first_poll {
+                send_notification(&config.notify_urgency, &item.repo, &item.title);
+            }
         }
     }
 
