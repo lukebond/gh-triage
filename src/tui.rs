@@ -283,15 +283,11 @@ fn run_tui_loop(
                                         let _ = db.archive_item(&item.id);
                                     }
                                 }
-                                // Move to next item row, or previous if at end
-                                let next = if idx + 1 < row_count {
-                                    next_item_row(&rows, idx, 1)
-                                } else if idx > 0 {
-                                    next_item_row(&rows, idx, -1)
-                                } else {
-                                    0
-                                };
-                                list_state.select(Some(next));
+                                // Stay at same index; the list will be one shorter
+                                // on next render so clamp to avoid going past the end.
+                                // row_count - 1 because we just removed one item.
+                                let max = row_count.saturating_sub(2);
+                                list_state.select(Some(idx.min(max)));
                             }
                         }
                     }
@@ -368,6 +364,7 @@ fn render_item<'a>(item: &'a Item, seen: &HashSet<String>, term_width: u16) -> L
     let reason_display = match item.reason.as_str() {
         "review_requested" => "Review requested",
         "assigned" => "Assigned",
+        "authored" => "Authored",
         "mentioned" => "Mentioned",
         "all" => "All",
         other => other,
@@ -376,6 +373,7 @@ fn render_item<'a>(item: &'a Item, seen: &HashSet<String>, term_width: u16) -> L
     let reason_color = match item.reason.as_str() {
         "review_requested" => Color::Yellow,
         "assigned" => Color::Cyan,
+        "authored" => Color::Green,
         _ => Color::White,
     };
 

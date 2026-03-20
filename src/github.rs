@@ -85,6 +85,7 @@ impl GithubClient {
                 "review_requested",
             ),
             (format!("assignee:{user} org:{org} is:open"), "assigned"),
+            (format!("author:{user} org:{org} is:open"), "authored"),
             (format!("mentions:{user} org:{org} is:open"), "mentioned"),
         ];
 
@@ -112,6 +113,7 @@ impl GithubClient {
             let closed_queries = vec![
                 format!("review-requested:{user} org:{org} is:closed updated:>{since}"),
                 format!("assignee:{user} org:{org} is:closed updated:>{since}"),
+                format!("author:{user} org:{org} is:closed updated:>{since}"),
                 format!("mentions:{user} org:{org} is:closed updated:>{since}"),
             ];
             for query in &closed_queries {
@@ -184,6 +186,7 @@ pub fn build_for_me_queries(user: &str, org: &str) -> Vec<String> {
     vec![
         format!("review-requested:{user} org:{org} is:open"),
         format!("assignee:{user} org:{org} is:open"),
+        format!("author:{user} org:{org} is:open"),
         format!("mentions:{user} org:{org} is:open"),
     ]
 }
@@ -211,11 +214,12 @@ mod tests {
     #[test]
     fn for_me_queries() {
         let queries = build_for_me_queries("alice", "myorg");
-        assert_eq!(queries.len(), 3);
+        assert_eq!(queries.len(), 4);
         assert!(queries[0].contains("review-requested:alice"));
         assert!(queries[0].contains("org:myorg"));
         assert!(queries[1].contains("assignee:alice"));
-        assert!(queries[2].contains("mentions:alice"));
+        assert!(queries[2].contains("author:alice"));
+        assert!(queries[3].contains("mentions:alice"));
     }
 
     #[test]
