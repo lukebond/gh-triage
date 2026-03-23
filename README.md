@@ -4,6 +4,10 @@ A GitHub notification triage tool for developers who struggle with the all-or-no
 
 `gh-triage` polls GitHub for activity you care about, maintains local state in SQLite, fires desktop notifications via `notify-send`, shows a Waybar-compatible badge, and presents a `ratatui` TUI for browsing and actioning items.
 
+<p align="center">
+  <img src="gh_triage_demo_screenshot_v2.svg" alt="gh-triage TUI screenshot" width="800">
+</p>
+
 ## Install
 
 ```bash
