@@ -30,30 +30,19 @@ impl GithubClient {
     }
 
     async fn search(&self, query: &str) -> Result<Vec<SearchItem>, GithubError> {
-        let url = format!(
-            "https://api.github.com/search/issues?q={}&per_page=100",
-            urlencoding(query)
-        );
+        let url = reqwest::Url::parse_with_params(
+            "https://api.github.com/search/issues",
+            &[("q", query), ("per_page", "100")],
+        )
+        .expect("valid base URL");
         let resp = self
             .client
-            .get(&url)
+            .get(url)
             .header(AUTHORIZATION, format!("Bearer {}", self.token))
             .header(USER_AGENT, "gh-triage")
             .header(ACCEPT, "application/vnd.github+json")
             .send()
             .await?;
-
-        // Check rate limit
-        if let Some(remaining) = resp
-            .headers()
-            .get("x-ratelimit-remaining")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u32>().ok())
-        {
-            if remaining == 0 {
-                return Err(GithubError::RateLimited);
-            }
-        }
 
         let status = resp.status();
         if !status.is_success() {
@@ -64,7 +53,23 @@ impl GithubClient {
             });
         }
 
+        // Capture rate limit info before consuming the body
+        let rate_limited = resp
+            .headers()
+            .get("x-ratelimit-remaining")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u32>().ok())
+            .is_some_and(|r| r == 0);
+
         let search_resp: SearchResponse = resp.json().await?;
+
+        if rate_limited {
+            eprintln!(
+                "[github] rate limit exhausted — got {} results but subsequent queries may fail",
+                search_resp.items.len()
+            );
+        }
+
         Ok(search_resp.items)
     }
 
@@ -210,16 +215,6 @@ impl GithubClient {
 
         Ok(result)
     }
-}
-
-/// Simple URL encoding for query strings.
-fn urlencoding(s: &str) -> String {
-    s.replace(' ', "+")
-        .replace(':', "%3A")
-        .replace('@', "%40")
-        .replace('>', "%3E")
-        .replace('{', "%7B")
-        .replace('}', "%7D")
 }
 
 /// Build search queries for testing — org wildcard scope.

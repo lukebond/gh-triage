@@ -15,6 +15,31 @@ pub enum DbError {
     ChronoParse(#[from] chrono::ParseError),
 }
 
+const SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS items (
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        item_type TEXT NOT NULL,
+        state TEXT NOT NULL,
+        reason TEXT,
+        author TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        first_seen_at TEXT NOT NULL,
+        last_activity_at TEXT,
+        comment_count INTEGER NOT NULL DEFAULT 0,
+        summary TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+    );
+    CREATE TABLE IF NOT EXISTS meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+";
+
 pub struct Db {
     conn: Connection,
 }
@@ -25,31 +50,8 @@ impl Db {
             std::fs::create_dir_all(parent).map_err(DbError::CreateDir)?;
         }
         let conn = Connection::open(path)?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS items (
-                id TEXT PRIMARY KEY,
-                url TEXT NOT NULL,
-                repo TEXT NOT NULL,
-                title TEXT NOT NULL,
-                body TEXT,
-                item_type TEXT NOT NULL,
-                state TEXT NOT NULL,
-                reason TEXT,
-                author TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                first_seen_at TEXT NOT NULL,
-                last_activity_at TEXT,
-                comment_count INTEGER NOT NULL DEFAULT 0,
-                summary TEXT,
-                status TEXT NOT NULL DEFAULT 'active'
-            );
-            CREATE TABLE IF NOT EXISTS meta (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );",
-        )?;
-        // Migrate: add comment_count if missing
+        conn.execute_batch(SCHEMA)?;
+        // Migrate: add comment_count if missing (for DBs created before this column existed)
         let has_comment_count: bool = conn
             .prepare("SELECT comment_count FROM items LIMIT 0")
             .is_ok();
@@ -65,30 +67,7 @@ impl Db {
     #[cfg(test)]
     pub fn open_in_memory() -> Result<Self, DbError> {
         let conn = Connection::open_in_memory()?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS items (
-                id TEXT PRIMARY KEY,
-                url TEXT NOT NULL,
-                repo TEXT NOT NULL,
-                title TEXT NOT NULL,
-                body TEXT,
-                item_type TEXT NOT NULL,
-                state TEXT NOT NULL,
-                reason TEXT,
-                author TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                first_seen_at TEXT NOT NULL,
-                last_activity_at TEXT,
-                comment_count INTEGER NOT NULL DEFAULT 0,
-                summary TEXT,
-                status TEXT NOT NULL DEFAULT 'active'
-            );
-            CREATE TABLE IF NOT EXISTS meta (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );",
-        )?;
+        conn.execute_batch(SCHEMA)?;
         Ok(Db { conn })
     }
 
@@ -267,7 +246,7 @@ impl ItemRow {
             repo: self.repo,
             title: self.title,
             body: self.body,
-            item_type: ItemType::from_str(&self.item_type),
+            item_type: ItemType::from_db_str(&self.item_type),
             state: self.state,
             reason: self.reason.unwrap_or_else(|| "unknown".to_string()),
             author: self.author,
@@ -280,7 +259,7 @@ impl ItemRow {
                 .transpose()?,
             comment_count: self.comment_count,
             summary: self.summary,
-            status: ItemStatus::from_str(&self.status_str),
+            status: ItemStatus::from_db_str(&self.status_str),
         })
     }
 }

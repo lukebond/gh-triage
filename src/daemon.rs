@@ -22,16 +22,9 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
     // Collect items that need summaries
     let mut needs_summary: Vec<SummaryJob> = Vec::new();
 
-    for (item, reason) in &results {
+    for (item, _reason) in &results {
         let (inserted, updated, prev_comment_count) = db.upsert_item(item)?;
-        let reason_label = match reason.as_str() {
-            "review_requested" => "Review requested",
-            "assigned" => "Assigned",
-            "authored" => "Authored",
-            "mentioned" => "Mentioned",
-            "all" => "Activity",
-            other => other,
-        };
+        let reason_label = item.reason_label();
         if inserted {
             new_count += 1;
             if !is_first_poll {
@@ -83,11 +76,12 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
         let db_path_owned = db_path.to_path_buf();
         let token = config.github_token.clone();
         let summary_config = summary_config.clone();
+        let mut handles = Vec::new();
         for job in needs_summary {
             let db_path = db_path_owned.clone();
             let token = token.clone();
             let sc = summary_config.clone();
-            tokio::spawn(async move {
+            handles.push(tokio::spawn(async move {
                 let summary = if job.is_update {
                     // Fetch only the new comments
                     let num_new = (job.new_comment_count - job.prev_comment_count) as usize;
@@ -96,6 +90,7 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
                         Ok(comments) => {
                             let new_comments: Vec<(String, String)> = comments
                                 .into_iter()
+                                .filter(|c| c.body.as_ref().is_some_and(|b| !b.is_empty()))
                                 .map(|c| (c.user.login, c.body.unwrap_or_default()))
                                 .collect();
                             generate_update_summary(
@@ -121,7 +116,12 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
                         let _ = db.set_summary(&job.id, &summary);
                     }
                 }
-            });
+            }));
+        }
+        for h in handles {
+            if let Err(e) = h.await {
+                eprintln!("[summary] task failed: {e}");
+            }
         }
     }
 

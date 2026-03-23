@@ -110,7 +110,7 @@ async fn run() -> Result<(), AppError> {
             } else {
                 for item in &items {
                     let type_label = item.item_type.short_label();
-                    let repo_short = item.repo.split('/').nth(1).unwrap_or(&item.repo);
+                    let repo_short = item.repo_short();
                     println!(
                         "{} {} {:<16} {}",
                         type_label, item.state, repo_short, item.title

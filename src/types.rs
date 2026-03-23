@@ -22,6 +22,23 @@ pub struct Item {
     pub status: ItemStatus,
 }
 
+impl Item {
+    pub fn repo_short(&self) -> &str {
+        self.repo.split('/').nth(1).unwrap_or(&self.repo)
+    }
+
+    pub fn reason_label(&self) -> &'static str {
+        match self.reason.as_str() {
+            "review_requested" => "Review requested",
+            "assigned" => "Assigned",
+            "authored" => "Authored",
+            "mentioned" => "Mentioned",
+            "all" => "Activity",
+            _ => "Other",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ItemType {
     Issue,
@@ -36,7 +53,8 @@ impl ItemType {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    /// Parse from DB string, defaulting to Issue for unknown values.
+    pub fn from_db_str(s: &str) -> Self {
         match s {
             "pull_request" => ItemType::PullRequest,
             _ => ItemType::Issue,
@@ -65,7 +83,8 @@ impl ItemStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    /// Parse from DB string, defaulting to Active for unknown values.
+    pub fn from_db_str(s: &str) -> Self {
         match s {
             "archived" => ItemStatus::Archived,
             _ => ItemStatus::Active,

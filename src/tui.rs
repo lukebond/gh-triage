@@ -52,7 +52,7 @@ pub fn run_tui(config: &Config, db_path: &Path) -> Result<(), crate::AppError> {
 }
 
 fn run_tui_loop(
-    config: &Config,
+    _config: &Config,
     db_path: &Path,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
 ) -> Result<(), crate::AppError> {
@@ -62,9 +62,9 @@ fn run_tui_loop(
     list_state.select(Some(0));
     let mut seen: HashSet<String> = HashSet::new();
     let mut show_help = false;
+    let db = Db::open(db_path)?;
 
     loop {
-        let db = Db::open(db_path)?;
         let status = match show_status {
             ShowStatus::Active => ItemStatus::Active,
             ShowStatus::Archived => ItemStatus::Archived,
@@ -271,8 +271,6 @@ fn run_tui_loop(
                         list_state.select(Some(prev));
                     }
                     KeyCode::Enter => {
-                        // Both "browser" and "preview" open in browser for v1
-                        let _ = &config.enter_action;
                         if let Some(idx) = list_state.selected() {
                             if let Some(Row::Item(item_idx)) = rows.get(idx) {
                                 if let Some(item) = items.get(*item_idx) {
@@ -286,7 +284,6 @@ fn run_tui_loop(
                             if let Some(idx) = list_state.selected() {
                                 if let Some(Row::Item(item_idx)) = rows.get(idx) {
                                     if let Some(item) = items.get(*item_idx) {
-                                        let db = Db::open(db_path)?;
                                         let _ = db.archive_item(&item.id);
                                     }
                                 }
@@ -345,9 +342,7 @@ fn build_rows(items: &[Item], view: View) -> Vec<Row> {
     let mut rows = Vec::new();
     match view {
         View::Latest => {
-            for i in 0..items.len() {
-                rows.push(Row::Item(i));
-            }
+            rows.extend((0..items.len()).map(Row::Item));
         }
         View::ByRepo => {
             let mut last_repo: Option<&str> = None;
@@ -387,15 +382,8 @@ fn render_item<'a>(item: &'a Item, seen: &HashSet<String>, term_width: u16) -> L
     let is_seen = seen.contains(&item.id);
     let indicator = if is_seen { " " } else { "●" };
     let type_label = item.item_type.short_label();
-    let repo_short = item.repo.split('/').nth(1).unwrap_or(&item.repo);
-    let reason_display = match item.reason.as_str() {
-        "review_requested" => "Review requested",
-        "assigned" => "Assigned",
-        "authored" => "Authored",
-        "mentioned" => "Mentioned",
-        "all" => "All",
-        other => other,
-    };
+    let repo_short = item.repo_short();
+    let reason_display = item.reason_label();
 
     let reason_color = match item.reason.as_str() {
         "review_requested" => Color::Yellow,

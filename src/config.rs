@@ -52,6 +52,7 @@ pub struct Config {
     pub github_token: String,
     pub github_user: String,
     pub poll_interval: u64,
+    #[allow(dead_code)] // TODO: implement preview mode
     pub enter_action: EnterAction,
     pub notify_urgency: String,
     pub notify_on: NotifyOn,
@@ -188,8 +189,8 @@ mod tests {
 
     #[test]
     fn parse_valid_config() {
-        std::env::set_var("GH_TOKEN", "test-token");
         let toml = r#"
+github_token = "test-token"
 github_user = "alice"
 poll_interval = 60
 enter_action = "browser"
@@ -218,8 +219,8 @@ repos = ["myorg/old-repo"]
 
     #[test]
     fn missing_optional_fields_get_defaults() {
-        std::env::set_var("GH_TOKEN", "test-token");
         let toml = r#"
+github_token = "test-token"
 github_user = "bob"
 
 [watch]
@@ -238,8 +239,8 @@ repos = ["org2/*"]
 
     #[test]
     fn multiple_orgs_and_repos() {
-        std::env::set_var("GH_TOKEN", "test-token");
         let toml = r#"
+github_token = "test-token"
 github_user = "carol"
 
 [watch]

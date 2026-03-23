@@ -23,7 +23,7 @@ pub fn run_waybar(db_path: &Path) -> Result<(), crate::AppError> {
             if count == 1 { "" } else { "s" }
         ))
         .chain(items.iter().take(5).map(|item| {
-            let repo_short = item.repo.split('/').nth(1).unwrap_or(&item.repo);
+            let repo_short = item.repo_short();
             format!("{}: {}", repo_short, item.title)
         }))
         .collect();
@@ -83,7 +83,7 @@ mod tests {
         let tooltip_lines: Vec<String> =
             std::iter::once(format!("{count} active GitHub notifications"))
                 .chain(items.iter().take(5).map(|item| {
-                    let repo_short = item.repo.split('/').nth(1).unwrap_or(&item.repo);
+                    let repo_short = item.repo_short();
                     format!("{}: {}", repo_short, item.title)
                 }))
                 .collect();
