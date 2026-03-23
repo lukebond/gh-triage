@@ -1,10 +1,8 @@
 # gh-triage
 
-A GitHub notification triage tool for developers who want to stay on top of things without missing anything. Written in Rust.
+A GitHub notification triage tool for developers who struggle with the all-or-nothing nature of GitHub's notifications. Too easy to accidentally mark something as read? It's gone. `gh-triage` remembers every item *until you actively archive it*.
 
-`gh-triage` polls GitHub for activity you care about, maintains local state in SQLite, fires desktop notifications via `notify-send`, shows a Waybar-compatible badge, and presents a TUI for browsing and actioning items.
-
-It does **not** use the GitHub notifications API. Instead it uses the GitHub search API to query directly for items relevant to you, giving full control over what is tracked.
+`gh-triage` polls GitHub for activity you care about, maintains local state in SQLite, fires desktop notifications via `notify-send`, shows a Waybar-compatible badge, and presents a `ratatui` TUI for browsing and actioning items.
 
 ## Install
 
