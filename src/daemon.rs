@@ -19,7 +19,7 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
     let mut updated_count = 0;
     let is_first_poll = last_poll.is_none();
 
-    // Collect items that need summaries: (id, item_type, title, body, url, prev_comment_count, new_comment_count)
+    // Collect items that need summaries
     let mut needs_summary: Vec<SummaryJob> = Vec::new();
 
     for (item, reason) in &results {
@@ -78,46 +78,51 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
         results.len()
     );
 
-    // Generate summaries in background
-    let db_path_owned = db_path.to_path_buf();
-    let token = config.github_token.clone();
-    for job in needs_summary {
-        let db_path = db_path_owned.clone();
-        let token = token.clone();
-        tokio::spawn(async move {
-            let summary = if job.is_update {
-                // Fetch only the new comments
-                let num_new = (job.new_comment_count - job.prev_comment_count) as usize;
-                let client = GithubClient::new(&token);
-                match client.fetch_recent_comments(&job.url, num_new).await {
-                    Ok(comments) => {
-                        let new_comments: Vec<(String, String)> = comments
-                            .into_iter()
-                            .map(|c| (c.user.login, c.body.unwrap_or_default()))
-                            .collect();
-                        generate_update_summary(
-                            &job.item_type,
-                            &job.title,
-                            &job.body,
-                            &new_comments,
-                        )
-                        .await
+    // Generate summaries in background (only if summary command is configured)
+    if let Some(summary_config) = &config.summary {
+        let db_path_owned = db_path.to_path_buf();
+        let token = config.github_token.clone();
+        let summary_config = summary_config.clone();
+        for job in needs_summary {
+            let db_path = db_path_owned.clone();
+            let token = token.clone();
+            let sc = summary_config.clone();
+            tokio::spawn(async move {
+                let summary = if job.is_update {
+                    // Fetch only the new comments
+                    let num_new = (job.new_comment_count - job.prev_comment_count) as usize;
+                    let client = GithubClient::new(&token);
+                    match client.fetch_recent_comments(&job.url, num_new).await {
+                        Ok(comments) => {
+                            let new_comments: Vec<(String, String)> = comments
+                                .into_iter()
+                                .map(|c| (c.user.login, c.body.unwrap_or_default()))
+                                .collect();
+                            generate_update_summary(
+                                &sc,
+                                &job.item_type,
+                                &job.title,
+                                &job.body,
+                                &new_comments,
+                            )
+                            .await
+                        }
+                        Err(e) => {
+                            eprintln!("[summary] failed to fetch comments for {}: {e}", job.url);
+                            None
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("[summary] failed to fetch comments for {}: {e}", job.url);
-                        None
-                    }
-                }
-            } else {
-                generate_summary(&job.item_type, &job.title, &job.body).await
-            };
+                } else {
+                    generate_summary(&sc, &job.item_type, &job.title, &job.body).await
+                };
 
-            if let Some(summary) = summary {
-                if let Ok(db) = Db::open(&db_path) {
-                    let _ = db.set_summary(&job.id, &summary);
+                if let Some(summary) = summary {
+                    if let Ok(db) = Db::open(&db_path) {
+                        let _ = db.set_summary(&job.id, &summary);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     Ok(())

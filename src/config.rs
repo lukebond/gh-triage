@@ -26,6 +26,13 @@ struct RawConfig {
     notify_urgency: Option<String>,
     notify_on: Option<String>,
     watch: RawWatch,
+    summary: Option<RawSummary>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSummary {
+    command: String,
+    args: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,6 +63,14 @@ pub struct Config {
     pub repos_all: HashSet<String>,
     /// Repos to skip entirely
     pub repos_ignore: HashSet<String>,
+    /// Summary command config (None = summaries disabled)
+    pub summary: Option<SummaryConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SummaryConfig {
+    pub command: String,
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +137,11 @@ impl Config {
             .map(|r| r.repos.into_iter().collect())
             .unwrap_or_default();
 
+        let summary = raw.summary.map(|s| SummaryConfig {
+            command: s.command,
+            args: s.args,
+        });
+
         Ok(Config {
             github_token,
             github_user: raw.github_user,
@@ -133,6 +153,7 @@ impl Config {
             watch_repos,
             repos_all,
             repos_ignore,
+            summary,
         })
     }
 }

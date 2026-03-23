@@ -471,9 +471,7 @@ fn wrap_text(text: &str, width: usize) -> Vec<String> {
             .map(|(i, _)| i)
             .unwrap_or(remaining.len());
         // Try to break at a space within that range
-        let break_at = remaining[..byte_limit]
-            .rfind(' ')
-            .unwrap_or(byte_limit);
+        let break_at = remaining[..byte_limit].rfind(' ').unwrap_or(byte_limit);
         lines.push(remaining[..break_at].to_string());
         remaining = remaining[break_at..].trim_start();
     }

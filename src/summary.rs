@@ -1,29 +1,26 @@
-use thiserror::Error;
+use crate::config::SummaryConfig;
 use tokio::process::Command;
 
-#[allow(dead_code)]
-#[derive(Error, Debug)]
-pub enum SummaryError {
-    #[error("failed to run claude: {0}")]
-    SpawnError(#[from] std::io::Error),
-    #[error("claude exited with non-zero status")]
-    NonZeroExit,
-}
-
 /// Generate an initial AI summary for a new item.
-/// Returns None if `claude` is not in PATH or fails.
-pub async fn generate_summary(item_type: &str, title: &str, body: &str) -> Option<String> {
+/// Returns None if no summary command is configured or it fails.
+pub async fn generate_summary(
+    config: &SummaryConfig,
+    item_type: &str,
+    title: &str,
+    body: &str,
+) -> Option<String> {
     let body_truncated: String = body.chars().take(2000).collect();
     let prompt = format!(
         "Summarise this GitHub {} in 1-2 sentences. Be concise and focus on what action (if any) is needed from a reviewer or assignee.\n\nTitle: {}\nBody: {}",
         item_type, title, body_truncated
     );
-    run_claude(&prompt).await
+    run_summary_command(config, &prompt).await
 }
 
 /// Regenerate a summary for an updated item, highlighting what's new.
 /// `new_comments` contains only the comments added since we last looked.
 pub async fn generate_update_summary(
+    config: &SummaryConfig,
     item_type: &str,
     title: &str,
     body: &str,
@@ -48,22 +45,17 @@ pub async fn generate_update_summary(
          New comments since last check:\n{}",
         item_type, title, body_truncated, comments_text
     );
-    run_claude(&prompt).await
+    run_summary_command(config, &prompt).await
 }
 
-async fn run_claude(prompt: &str) -> Option<String> {
-    let result = Command::new("claude")
-        .args([
-            "-p",
-            prompt,
-            "--no-session-persistence",
-            "--allowedTools",
-            "",
-            "--output-format",
-            "text",
-        ])
-        .output()
-        .await;
+async fn run_summary_command(config: &SummaryConfig, prompt: &str) -> Option<String> {
+    let args: Vec<String> = config
+        .args
+        .iter()
+        .map(|a| a.replace("{prompt}", prompt))
+        .collect();
+
+    let result = Command::new(&config.command).args(&args).output().await;
 
     match result {
         Ok(output) => {

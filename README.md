@@ -88,7 +88,21 @@ Archiving an item hides it from the active list. If new comments are added to an
 
 ## AI summaries
 
-When new items are found, `gh-triage` shells out to the `claude` CLI to generate a 1-2 sentence summary. When an item gets new comments, the summary is regenerated with a focus on what's new. If `claude` is not in PATH, summaries are silently skipped.
+When new items are found, `gh-triage` generates a 1-2 sentence summary using a configurable command. When an item gets new comments, the summary is regenerated with a focus on what's new. Omit the `[summary]` section from your config to disable.
+
+```toml
+# Claude Code CLI
+[summary]
+command = "claude"
+args = ["-p", "{prompt}", "--no-session-persistence", "--allowedTools", "", "--output-format", "text"]
+
+# Or use a local model via Ollama (free)
+# [summary]
+# command = "ollama"
+# args = ["run", "llama3.1", "{prompt}"]
+```
+
+The `{prompt}` placeholder is replaced with the generated prompt text.
 
 ## Setup helpers
 

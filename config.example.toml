@@ -44,3 +44,17 @@ repos = [
 repos = [
     # "your-org/archived-repo",
 ]
+
+# AI summary generation. Omit this section to disable summaries.
+# The {prompt} placeholder is replaced with the generated prompt text.
+# Examples:
+#
+# Claude Code CLI:
+# [summary]
+# command = "claude"
+# args = ["-p", "{prompt}", "--no-session-persistence", "--allowedTools", "", "--output-format", "text"]
+#
+# Ollama (local, free):
+# [summary]
+# command = "ollama"
+# args = ["run", "llama3.1", "{prompt}"]
