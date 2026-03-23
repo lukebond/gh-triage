@@ -459,12 +459,21 @@ fn wrap_text(text: &str, width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut remaining = text;
     while !remaining.is_empty() {
-        if remaining.len() <= width {
+        let char_count: usize = remaining.chars().count();
+        if char_count <= width {
             lines.push(remaining.to_string());
             break;
         }
-        // Try to break at a space
-        let break_at = remaining[..width].rfind(' ').unwrap_or(width);
+        // Find the byte offset of the char at position `width`
+        let byte_limit = remaining
+            .char_indices()
+            .nth(width)
+            .map(|(i, _)| i)
+            .unwrap_or(remaining.len());
+        // Try to break at a space within that range
+        let break_at = remaining[..byte_limit]
+            .rfind(' ')
+            .unwrap_or(byte_limit);
         lines.push(remaining[..break_at].to_string());
         remaining = remaining[break_at..].trim_start();
     }
@@ -486,5 +495,38 @@ fn format_relative_time(dt: chrono::DateTime<Utc>) -> String {
         format!("{}m ago", diff.num_minutes())
     } else {
         "just now".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wrap_text_ascii() {
+        let lines = wrap_text("hello world foo bar", 12);
+        assert_eq!(lines, vec!["hello world", "foo bar"]);
+    }
+
+    #[test]
+    fn wrap_text_short_enough() {
+        let lines = wrap_text("short", 20);
+        assert_eq!(lines, vec!["short"]);
+    }
+
+    #[test]
+    fn wrap_text_multibyte_emdash() {
+        // "—" is 3 bytes in UTF-8; wrapping must not split it
+        let text = "no urgent action needed beyond standard code review — this is fine";
+        let lines = wrap_text(text, 55);
+        assert_eq!(lines.len(), 2);
+        assert!(!lines[0].is_empty());
+        assert!(!lines[1].is_empty());
+    }
+
+    #[test]
+    fn wrap_text_empty() {
+        let lines = wrap_text("", 40);
+        assert_eq!(lines, vec![""]);
     }
 }
