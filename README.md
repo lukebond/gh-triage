@@ -25,18 +25,32 @@ $EDITOR ~/.config/gh-triage/config.toml
 See `config.example.toml` for a commented starting point. The key fields:
 
 ```toml
-github_token = "ghp_..."   # or use GH_TOKEN env var
 github_user = "your-username"
-github_org = "your-org"
+
+[watch]
+repos = [
+    "your-org/*",              # entire org — wildcard
+    "someone/specific-repo",   # individual repo
+]
 ```
 
-### Presets
+The GitHub token is resolved automatically from (in order): `github_token` in config, `GH_TOKEN` env var, or `gh auth token`.
 
-| Preset | Behaviour |
-|--------|-----------|
-| `for_me` (default) | PRs/issues where you are a requested reviewer, assignee, or mentioned |
-| `all` | Everything in the repo — all issues and PRs |
-| `ignore` | Skip the repo entirely |
+### Watch rules
+
+`watch.repos` entries support two forms:
+
+- **`org/*`** — watch all repos in an org (uses `org:` GitHub search qualifier)
+- **`owner/repo`** — watch a specific repo (uses `repo:` qualifier)
+
+For all watched repos, items where you are a requested reviewer, assignee, author, or mentioned are tracked.
+
+### Per-repo overrides
+
+| Section | Behaviour |
+|---------|-----------|
+| `[watch.all]` | Fetch everything (all issues/PRs) regardless of involvement |
+| `[watch.ignore]` | Skip entirely, even if it matches a watch rule |
 
 ## Usage
 
@@ -57,20 +71,22 @@ github_org = "your-org"
 |-----|--------|
 | `j` / `↓` | Move down |
 | `k` / `↑` | Move up |
+| `g` / `G` | Go to first / last item |
 | `Enter` | Open in browser |
 | `a` | Archive item (re-appears if new activity occurs) |
 | `A` | Toggle archived view |
 | `Tab` | Toggle latest / by-repo view |
 | `R` | Refresh |
+| `?` | Keybindings popup |
 | `q` | Quit |
 
-Items show a `●` indicator when unseen in the current session. Colour coding: yellow = review requested, cyan = assigned, white = mentioned. Press `?` for a keybindings popup.
+Items show a `●` indicator when unseen in the current session. Colour coding: yellow = review requested, cyan = assigned, green = authored, white = mentioned.
 
-Archiving an item hides it from the active list. If new activity is detected on an archived item (e.g. a new comment), it automatically returns to the active list.
+Archiving an item hides it from the active list. If new comments are added to an archived item, it automatically returns to the active list.
 
 ## AI summaries
 
-When new items are found, `gh-triage` shells out to the `claude` CLI to generate a 1-2 sentence summary. If `claude` is not in PATH, summaries are silently skipped.
+When new items are found, `gh-triage` shells out to the `claude` CLI to generate a 1-2 sentence summary. When an item gets new comments, the summary is regenerated with a focus on what's new. If `claude` is not in PATH, summaries are silently skipped.
 
 ## Setup helpers
 
@@ -106,12 +122,10 @@ gh-triage list 2>/dev/null
 Or for a one-line count:
 
 ```bash
-echo "$(gh-triage waybar 2>/dev/null | jq -r '.tooltip // empty')"
+gh-triage waybar 2>/dev/null | jq -r '.tooltip // empty'
 ```
 
 Either line will silently do nothing if the database doesn't exist yet or the config isn't set up.
-
-> This one-liner is useful to add to your `.bashrc` (exclude the echo and outer parentheses) for a dose of notification doom on each new terminal opened.
 
 ## Data locations
 

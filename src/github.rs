@@ -114,57 +114,59 @@ impl GithubClient {
         last_poll: Option<DateTime<Utc>>,
     ) -> Result<Vec<(Item, String)>, GithubError> {
         let mut all_items: HashMap<String, (SearchItem, String)> = HashMap::new();
-        let org = &config.github_org;
         let user = &config.github_user;
 
-        // "for_me" queries
-        let queries_for_me = vec![
-            (
-                format!("review-requested:{user} org:{org} is:open"),
-                "review_requested",
-            ),
-            (format!("assignee:{user} org:{org} is:open"), "assigned"),
-            (format!("author:{user} org:{org} is:open"), "authored"),
-            (format!("mentions:{user} org:{org} is:open"), "mentioned"),
+        // Build scope prefixes for for_me queries: "org:X" for wildcards, "repo:X" for specific
+        let scopes: Vec<String> = config
+            .watch_orgs
+            .iter()
+            .map(|org| format!("org:{org}"))
+            .chain(config.watch_repos.iter().map(|repo| format!("repo:{repo}")))
+            .collect();
+
+        let reasons = [
+            ("review-requested", "review_requested"),
+            ("assignee", "assigned"),
+            ("author", "authored"),
+            ("mentions", "mentioned"),
         ];
 
-        for (query, reason) in &queries_for_me {
-            let items = self.search(query).await?;
-            for item in items {
-                // Skip ignored repos
-                let repo = item.repo_name();
-                if config.repos_ignore.contains(&repo) {
-                    continue;
+        // "for_me" queries across all scopes
+        for scope in &scopes {
+            for (qualifier, reason) in &reasons {
+                let query = format!("{qualifier}:{user} {scope} is:open");
+                let items = self.search(&query).await?;
+                for item in items {
+                    let repo = item.repo_name();
+                    if config.repos_ignore.contains(&repo) {
+                        continue;
+                    }
+                    if config.repos_all.contains(&repo) {
+                        continue;
+                    }
+                    all_items
+                        .entry(item.html_url.clone())
+                        .or_insert((item, reason.to_string()));
                 }
-                // Skip items from "all" repos (they'll be fetched separately)
-                if config.repos_all.contains(&repo) {
-                    continue;
-                }
-                all_items
-                    .entry(item.html_url.clone())
-                    .or_insert((item, reason.to_string()));
             }
         }
 
         // Also check recently closed for_me items
         if let Some(last) = last_poll {
             let since = last.format("%Y-%m-%dT%H:%M:%S").to_string();
-            let closed_queries = vec![
-                format!("review-requested:{user} org:{org} is:closed updated:>{since}"),
-                format!("assignee:{user} org:{org} is:closed updated:>{since}"),
-                format!("author:{user} org:{org} is:closed updated:>{since}"),
-                format!("mentions:{user} org:{org} is:closed updated:>{since}"),
-            ];
-            for query in &closed_queries {
-                let items = self.search(query).await?;
-                for item in items {
-                    let repo = item.repo_name();
-                    if config.repos_ignore.contains(&repo) || config.repos_all.contains(&repo) {
-                        continue;
+            for scope in &scopes {
+                for (qualifier, reason) in &reasons {
+                    let query = format!("{qualifier}:{user} {scope} is:closed updated:>{since}");
+                    let items = self.search(&query).await?;
+                    for item in items {
+                        let repo = item.repo_name();
+                        if config.repos_ignore.contains(&repo) || config.repos_all.contains(&repo) {
+                            continue;
+                        }
+                        all_items
+                            .entry(item.html_url.clone())
+                            .or_insert((item, reason.to_string()));
                     }
-                    all_items
-                        .entry(item.html_url.clone())
-                        .or_insert((item, "mentioned".to_string()));
                 }
             }
         }
@@ -220,14 +222,25 @@ fn urlencoding(s: &str) -> String {
         .replace('}', "%7D")
 }
 
-/// Build search queries for testing.
+/// Build search queries for testing — org wildcard scope.
 #[cfg(test)]
-pub fn build_for_me_queries(user: &str, org: &str) -> Vec<String> {
+pub fn build_for_me_queries_org(user: &str, org: &str) -> Vec<String> {
     vec![
         format!("review-requested:{user} org:{org} is:open"),
         format!("assignee:{user} org:{org} is:open"),
         format!("author:{user} org:{org} is:open"),
         format!("mentions:{user} org:{org} is:open"),
+    ]
+}
+
+/// Build search queries for testing — specific repo scope.
+#[cfg(test)]
+pub fn build_for_me_queries_repo(user: &str, repo: &str) -> Vec<String> {
+    vec![
+        format!("review-requested:{user} repo:{repo} is:open"),
+        format!("assignee:{user} repo:{repo} is:open"),
+        format!("author:{user} repo:{repo} is:open"),
+        format!("mentions:{user} repo:{repo} is:open"),
     ]
 }
 
@@ -252,11 +265,22 @@ mod tests {
     use crate::types::{PullRequestRef, SearchUser};
 
     #[test]
-    fn for_me_queries() {
-        let queries = build_for_me_queries("alice", "myorg");
+    fn for_me_queries_org() {
+        let queries = build_for_me_queries_org("alice", "myorg");
         assert_eq!(queries.len(), 4);
         assert!(queries[0].contains("review-requested:alice"));
         assert!(queries[0].contains("org:myorg"));
+        assert!(queries[1].contains("assignee:alice"));
+        assert!(queries[2].contains("author:alice"));
+        assert!(queries[3].contains("mentions:alice"));
+    }
+
+    #[test]
+    fn for_me_queries_repo() {
+        let queries = build_for_me_queries_repo("alice", "someuser/repo");
+        assert_eq!(queries.len(), 4);
+        assert!(queries[0].contains("review-requested:alice"));
+        assert!(queries[0].contains("repo:someuser/repo"));
         assert!(queries[1].contains("assignee:alice"));
         assert!(queries[2].contains("author:alice"));
         assert!(queries[3].contains("mentions:alice"));

@@ -2,14 +2,12 @@
 # Copy to ~/.config/gh-triage/config.toml and edit to suit.
 
 # GitHub personal access token. Needs repo scope.
-# Can also be set via the GH_TOKEN environment variable.
-github_token = "ghp_your_token_here"
+# Can also be set via the GH_TOKEN environment variable,
+# or picked up automatically from the gh CLI (gh auth token).
+# github_token = "ghp_your_token_here"
 
 # Your GitHub username
 github_user = "your-username"
-
-# The organisation to monitor
-github_org = "your-org"
 
 # Poll interval in seconds
 poll_interval = 120
@@ -25,15 +23,24 @@ notify_urgency = "normal"
 #   "new_activity"  — any time a tracked item is updated
 notify_on = "new_activity"
 
-# Repos where you want to see *everything* (all issues and PRs).
-# Most users leave this empty or add 1-2 high-priority repos.
-[repos.all]
+# What to watch. Use "org/*" for an entire org, or "owner/repo" for specific repos.
+# Items assigned to you, authored by you, mentioning you, or requesting your review
+# will be tracked across all entries.
+[watch]
+repos = [
+    "your-org/*",
+    # "your-username/personal-project",
+]
+
+# Repos where you want to see *everything* (all issues and PRs),
+# regardless of whether they involve you.
+[watch.all]
 repos = [
     # "your-org/important-repo",
 ]
 
-# Repos to ignore completely.
-[repos.ignore]
+# Repos to ignore completely, even if they match a watch rule.
+[watch.ignore]
 repos = [
     # "your-org/archived-repo",
 ]

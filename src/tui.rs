@@ -89,7 +89,6 @@ fn run_tui_loop(
             }
         }
 
-        let org = &config.github_org;
         let item_count = items.len();
         let status_label = match show_status {
             ShowStatus::Active => "active",
@@ -113,7 +112,7 @@ fn run_tui_loop(
                 let header = Paragraph::new(Line::from(vec![
                     Span::styled("gh-triage", Style::default().fg(Color::Green).bold()),
                     Span::raw(format!(
-                        "          [{status_label}: {item_count}]    org: {org}    q quit"
+                        "          [{status_label}: {item_count}]    ? help    q quit"
                     )),
                 ]));
                 frame.render_widget(header, chunks[0]);
