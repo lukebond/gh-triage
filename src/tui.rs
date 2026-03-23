@@ -202,6 +202,14 @@ fn run_tui_loop(
                             Span::raw("            Toggle latest / by repo"),
                         ]),
                         Line::from(vec![
+                            Span::styled("g", Style::default().fg(Color::Yellow).bold()),
+                            Span::raw("              Go to first item"),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("G", Style::default().fg(Color::Yellow).bold()),
+                            Span::raw("              Go to last item"),
+                        ]),
+                        Line::from(vec![
                             Span::styled("R", Style::default().fg(Color::Yellow).bold()),
                             Span::raw("              Refresh"),
                         ]),
@@ -305,6 +313,18 @@ fn run_tui_loop(
                         };
                         list_state.select(Some(0));
                     }
+                    KeyCode::Char('g') => {
+                        // Jump to first item
+                        let first = next_item_row(&rows, 0, 0);
+                        list_state.select(Some(first));
+                    }
+                    KeyCode::Char('G') => {
+                        // Jump to last item
+                        if row_count > 0 {
+                            let last = next_item_row(&rows, row_count - 1, 0);
+                            list_state.select(Some(last));
+                        }
+                    }
                     KeyCode::Char('R') => {
                         // Refresh — just re-render on next loop iteration
                     }
@@ -344,8 +364,16 @@ fn build_rows(items: &[Item], view: View) -> Vec<Row> {
     rows
 }
 
-/// Find the next Item row in direction (1 = down, -1 = up), skipping headers.
+/// Find the next Item row in direction (1 = down, -1 = up, 0 = at or after current), skipping headers.
 fn next_item_row(rows: &[Row], current: usize, direction: i32) -> usize {
+    // direction 0: find the nearest item at current position or forward
+    if direction == 0 {
+        if current < rows.len() && matches!(rows[current], Row::Item(_)) {
+            return current;
+        }
+        // Try forward then backward
+        return next_item_row(rows, current, 1);
+    }
     let mut i = current as i32 + direction;
     while i >= 0 && (i as usize) < rows.len() {
         if matches!(rows[i as usize], Row::Item(_)) {

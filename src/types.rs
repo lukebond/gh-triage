@@ -17,6 +17,7 @@ pub struct Item {
     pub updated_at: DateTime<Utc>,
     pub first_seen_at: DateTime<Utc>,
     pub last_activity_at: Option<DateTime<Utc>>,
+    pub comment_count: u32,
     pub summary: Option<String>,
     pub status: ItemStatus,
 }
@@ -88,6 +89,7 @@ pub struct SearchItem {
     pub user: SearchUser,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub comments: Option<u32>,
     pub pull_request: Option<PullRequestRef>,
     pub repository_url: String,
 }
@@ -119,4 +121,12 @@ pub struct SearchUser {
 #[allow(dead_code)]
 pub struct PullRequestRef {
     pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Comment {
+    pub user: SearchUser,
+    pub body: Option<String>,
+    #[allow(dead_code)]
+    pub created_at: DateTime<Utc>,
 }

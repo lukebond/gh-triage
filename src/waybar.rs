@@ -61,6 +61,7 @@ mod tests {
             updated_at: now,
             first_seen_at: now,
             last_activity_at: Some(now),
+            comment_count: 0,
             summary: None,
             status: ItemStatus::Active,
         }

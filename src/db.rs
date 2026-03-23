@@ -40,6 +40,7 @@ impl Db {
                 updated_at TEXT NOT NULL,
                 first_seen_at TEXT NOT NULL,
                 last_activity_at TEXT,
+                comment_count INTEGER NOT NULL DEFAULT 0,
                 summary TEXT,
                 status TEXT NOT NULL DEFAULT 'active'
             );
@@ -48,6 +49,16 @@ impl Db {
                 value TEXT NOT NULL
             );",
         )?;
+        // Migrate: add comment_count if missing
+        let has_comment_count: bool = conn
+            .prepare("SELECT comment_count FROM items LIMIT 0")
+            .is_ok();
+        if !has_comment_count {
+            conn.execute_batch(
+                "ALTER TABLE items ADD COLUMN comment_count INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+
         Ok(Db { conn })
     }
 
@@ -69,6 +80,7 @@ impl Db {
                 updated_at TEXT NOT NULL,
                 first_seen_at TEXT NOT NULL,
                 last_activity_at TEXT,
+                comment_count INTEGER NOT NULL DEFAULT 0,
                 summary TEXT,
                 status TEXT NOT NULL DEFAULT 'active'
             );
@@ -81,23 +93,23 @@ impl Db {
     }
 
     /// Insert a new item or update it if the URL already exists and updated_at has changed.
-    /// Returns (was_inserted, was_updated).
-    pub fn upsert_item(&self, item: &Item) -> Result<(bool, bool), DbError> {
+    /// Returns (was_inserted, was_updated, previous_comment_count).
+    pub fn upsert_item(&self, item: &Item) -> Result<(bool, bool, u32), DbError> {
         // Check if item exists
-        let existing: Option<(String, String)> = self
+        let existing: Option<(String, String, u32)> = self
             .conn
             .query_row(
-                "SELECT id, updated_at FROM items WHERE id = ?1",
+                "SELECT id, updated_at, comment_count FROM items WHERE id = ?1",
                 params![item.id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .ok();
 
         match existing {
             None => {
                 self.conn.execute(
-                    "INSERT INTO items (id, url, repo, title, body, item_type, state, reason, author, created_at, updated_at, first_seen_at, last_activity_at, summary, status)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                    "INSERT INTO items (id, url, repo, title, body, item_type, state, reason, author, created_at, updated_at, first_seen_at, last_activity_at, comment_count, summary, status)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                     params![
                         item.id,
                         item.url,
@@ -112,17 +124,18 @@ impl Db {
                         item.updated_at.to_rfc3339(),
                         item.first_seen_at.to_rfc3339(),
                         item.last_activity_at.map(|d| d.to_rfc3339()),
+                        item.comment_count,
                         item.summary,
                         item.status.as_str(),
                     ],
                 )?;
-                Ok((true, false))
+                Ok((true, false, 0))
             }
-            Some((_id, existing_updated)) => {
+            Some((_id, existing_updated, prev_comment_count)) => {
                 let new_updated = item.updated_at.to_rfc3339();
                 if existing_updated != new_updated {
                     self.conn.execute(
-                        "UPDATE items SET title = ?1, body = ?2, state = ?3, updated_at = ?4, last_activity_at = ?5, reason = ?6, status = 'active' WHERE id = ?7",
+                        "UPDATE items SET title = ?1, body = ?2, state = ?3, updated_at = ?4, last_activity_at = ?5, reason = ?6, comment_count = ?7, status = 'active' WHERE id = ?8",
                         params![
                             item.title,
                             item.body,
@@ -130,12 +143,13 @@ impl Db {
                             new_updated,
                             item.updated_at.to_rfc3339(),
                             item.reason,
+                            item.comment_count,
                             item.id,
                         ],
                     )?;
-                    Ok((false, true))
+                    Ok((false, true, prev_comment_count))
                 } else {
-                    Ok((false, false))
+                    Ok((false, false, prev_comment_count))
                 }
             }
         }
@@ -144,7 +158,7 @@ impl Db {
     pub fn get_items(&self, status: ItemStatus) -> Result<Vec<Item>, DbError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, url, repo, title, body, item_type, state, reason, author,
-                    created_at, updated_at, first_seen_at, last_activity_at, summary, status
+                    created_at, updated_at, first_seen_at, last_activity_at, comment_count, summary, status
              FROM items WHERE status = ?1 ORDER BY updated_at DESC",
         )?;
         let items = stmt
@@ -163,8 +177,9 @@ impl Db {
                     updated_at: row.get(10)?,
                     first_seen_at: row.get(11)?,
                     last_activity_at: row.get(12)?,
-                    summary: row.get(13)?,
-                    status_str: row.get(14)?,
+                    comment_count: row.get(13)?,
+                    summary: row.get(14)?,
+                    status_str: row.get(15)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -239,6 +254,7 @@ struct ItemRow {
     updated_at: String,
     first_seen_at: String,
     last_activity_at: Option<String>,
+    comment_count: u32,
     summary: Option<String>,
     status_str: String,
 }
@@ -262,6 +278,7 @@ impl ItemRow {
                 .last_activity_at
                 .map(|s| DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&Utc)))
                 .transpose()?,
+            comment_count: self.comment_count,
             summary: self.summary,
             status: ItemStatus::from_str(&self.status_str),
         })
@@ -289,6 +306,7 @@ mod tests {
             updated_at: now,
             first_seen_at: now,
             last_activity_at: Some(now),
+            comment_count: 0,
             summary: None,
             status: ItemStatus::Active,
         }
@@ -298,7 +316,7 @@ mod tests {
     fn insert_and_fetch() {
         let db = Db::open_in_memory().unwrap();
         let item = make_item("node1", "Test issue");
-        let (inserted, updated) = db.upsert_item(&item).unwrap();
+        let (inserted, updated, _) = db.upsert_item(&item).unwrap();
         assert!(inserted);
         assert!(!updated);
 
@@ -312,7 +330,7 @@ mod tests {
         let db = Db::open_in_memory().unwrap();
         let item = make_item("node1", "Test issue");
         db.upsert_item(&item).unwrap();
-        let (inserted, updated) = db.upsert_item(&item).unwrap();
+        let (inserted, updated, _) = db.upsert_item(&item).unwrap();
         assert!(!inserted);
         assert!(!updated);
         assert_eq!(db.get_items(ItemStatus::Active).unwrap().len(), 1);
@@ -337,7 +355,7 @@ mod tests {
 
         item.updated_at = item.updated_at + chrono::Duration::seconds(60);
         item.title = "Updated title".to_string();
-        let (inserted, updated) = db.upsert_item(&item).unwrap();
+        let (inserted, updated, _) = db.upsert_item(&item).unwrap();
         assert!(!inserted);
         assert!(updated);
 

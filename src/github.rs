@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::config::Config;
-use crate::types::{Item, ItemStatus, SearchItem, SearchResponse};
+use crate::types::{Comment, Item, ItemStatus, SearchItem, SearchResponse};
 
 #[derive(Error, Debug)]
 pub enum GithubError {
@@ -66,6 +66,45 @@ impl GithubClient {
 
         let search_resp: SearchResponse = resp.json().await?;
         Ok(search_resp.items)
+    }
+
+    /// Fetch recent comments on an issue or PR.
+    /// `url` is an HTML URL like https://github.com/owner/repo/issues/123
+    /// Returns the last `limit` comments in chronological order.
+    pub async fn fetch_recent_comments(
+        &self,
+        url: &str,
+        limit: usize,
+    ) -> Result<Vec<Comment>, GithubError> {
+        // Convert HTML URL to API comments endpoint
+        let api_url = url
+            .replace("https://github.com/", "https://api.github.com/repos/")
+            .replace("/pull/", "/issues/")
+            + "/comments";
+        let api_url = format!("{api_url}?per_page={limit}&page=1&direction=desc");
+
+        let resp = self
+            .client
+            .get(&api_url)
+            .header(AUTHORIZATION, format!("Bearer {}", self.token))
+            .header(USER_AGENT, "gh-triage")
+            .header(ACCEPT, "application/vnd.github+json")
+            .send()
+            .await?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(GithubError::ApiError {
+                status: status.as_u16(),
+                body,
+            });
+        }
+
+        let mut comments: Vec<Comment> = resp.json().await?;
+        // API returns newest first with direction=desc, reverse to chronological
+        comments.reverse();
+        Ok(comments)
     }
 
     /// Run all queries for a poll cycle and return deduplicated items.
@@ -159,6 +198,7 @@ impl GithubClient {
                     updated_at: search_item.updated_at,
                     first_seen_at: now,
                     last_activity_at: Some(search_item.updated_at),
+                    comment_count: search_item.comments.unwrap_or(0),
                     summary: None,
                     status: ItemStatus::Active,
                 };
@@ -242,6 +282,7 @@ mod tests {
                 },
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
+                comments: Some(0),
                 pull_request: None,
                 repository_url: "https://api.github.com/repos/a/b".to_string(),
             },
@@ -256,6 +297,7 @@ mod tests {
                 },
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
+                comments: Some(0),
                 pull_request: None,
                 repository_url: "https://api.github.com/repos/a/b".to_string(),
             },
@@ -270,6 +312,7 @@ mod tests {
                 },
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
+                comments: Some(3),
                 pull_request: Some(PullRequestRef {
                     url: "https://api.github.com/repos/a/b/pulls/2".to_string(),
                 }),
