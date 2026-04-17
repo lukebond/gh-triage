@@ -54,7 +54,7 @@ repos = [
 # command = "claude"
 # args = ["-p", "{prompt}", "--no-session-persistence", "--allowedTools", "", "--output-format", "text"]
 #
-# Ollama (local, free):
+# Ollama (local, free — --nowordwrap is required to avoid garbled output):
 # [summary]
 # command = "ollama"
-# args = ["run", "llama3.1", "{prompt}"]
+# args = ["run", "--nowordwrap", "llama3.1", "{prompt}"]

@@ -174,6 +174,16 @@ impl Db {
         Ok(rows > 0)
     }
 
+    /// Return the set of all repos that have ever had items in the DB.
+    /// Used to suppress notifications when first polling a newly-added repo.
+    pub fn known_repos(&self) -> Result<std::collections::HashSet<String>, DbError> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT repo FROM items")?;
+        let repos = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<std::collections::HashSet<_>, _>>()?;
+        Ok(repos)
+    }
+
     pub fn set_summary(&self, id: &str, summary: &str) -> Result<(), DbError> {
         self.conn.execute(
             "UPDATE items SET summary = ?1 WHERE id = ?2",

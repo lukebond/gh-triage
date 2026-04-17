@@ -96,10 +96,10 @@ When new items are found, `gh-triage` generates a 1-2 sentence summary using a c
 command = "claude"
 args = ["-p", "{prompt}", "--no-session-persistence", "--allowedTools", "", "--output-format", "text"]
 
-# Or use a local model via Ollama (free)
+# Or use a local model via Ollama (free — --nowordwrap is required)
 # [summary]
 # command = "ollama"
-# args = ["run", "llama3.1", "{prompt}"]
+# args = ["run", "--nowordwrap", "llama3.1", "{prompt}"]
 ```
 
 The `{prompt}` placeholder is replaced with the generated prompt text.

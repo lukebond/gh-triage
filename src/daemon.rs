@@ -18,6 +18,10 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
     let mut new_count = 0;
     let mut updated_count = 0;
     let is_first_poll = last_poll.is_none();
+    // Snapshot of repos we already know about, computed before any inserts.
+    // Items from repos not in this set are being backfilled (new repo added to config)
+    // and should not trigger notifications.
+    let known_repos = db.known_repos()?;
 
     // Collect items that need summaries
     let mut needs_summary: Vec<SummaryJob> = Vec::new();
@@ -25,9 +29,10 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
     for (item, _reason) in &results {
         let (inserted, updated, prev_comment_count) = db.upsert_item(item)?;
         let reason_label = item.reason_label();
+        let repo_known = known_repos.contains(&item.repo);
         if inserted {
             new_count += 1;
-            if !is_first_poll {
+            if !is_first_poll && repo_known {
                 let body = format!("[{reason_label}] {}", item.title);
                 send_notification(&config.notify_urgency, &item.repo, &body);
             }
@@ -43,7 +48,7 @@ pub async fn run_poll(config: &Config, db_path: &Path) -> Result<(), crate::AppE
             });
         } else if updated {
             updated_count += 1;
-            if !is_first_poll && config.notify_on == NotifyOn::NewActivity {
+            if !is_first_poll && repo_known && config.notify_on == NotifyOn::NewActivity {
                 let body = format!("[{reason_label}] {}", item.title);
                 send_notification(&config.notify_urgency, &item.repo, &body);
             }
