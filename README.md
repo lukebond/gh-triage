@@ -90,6 +90,8 @@ Archiving an item hides it from the active list. If new comments are added to an
 
 When new items are found, `gh-triage` generates a 1-2 sentence summary using a configurable command. When an item gets new comments, the summary is regenerated with a focus on what's new. Omit the `[summary]` section from your config to disable.
 
+If you feel that such a trivial thing as your personal productivity is not worth destroying the planet, you can use a local model (see ollama example). The ollami CLI assumes it's writing to a terminal so sometimes injects control characters to move the cursor, resulting in odd spacing. It's very usable, but I should fix it someday.
+
 ```toml
 # Claude Code CLI
 [summary]
