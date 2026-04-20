@@ -209,6 +209,10 @@ fn run_tui_loop(
                             Span::raw("              Go to last item"),
                         ]),
                         Line::from(vec![
+                            Span::styled("z", Style::default().fg(Color::Yellow).bold()),
+                            Span::raw("              Centre view on selection"),
+                        ]),
+                        Line::from(vec![
                             Span::styled("R", Style::default().fg(Color::Yellow).bold()),
                             Span::raw("              Refresh"),
                         ]),
@@ -222,7 +226,7 @@ fn run_tui_loop(
                         ]),
                     ];
 
-                    let help_width = 40u16;
+                    let help_width = 42u16;
                     let help_height = (help_text.len() as u16) + 2; // +2 for borders
                     let x = area.width.saturating_sub(help_width) / 2;
                     let y = area.height.saturating_sub(help_height) / 2;
@@ -321,6 +325,21 @@ fn run_tui_loop(
                             list_state.select(Some(last));
                         }
                     }
+                    KeyCode::Char('z') => {
+                        // Centre the view on the current selection
+                        if let Some(idx) = list_state.selected() {
+                            // Each item takes multiple lines; estimate visible rows
+                            // by using the list area height (chunks[2] from layout).
+                            // We approximate with terminal height minus header (2 lines + border).
+                            let visible = terminal
+                                .size()
+                                .map(|s| s.height.saturating_sub(4) as usize)
+                                .unwrap_or(20);
+                            let half = visible / 2;
+                            let new_offset = idx.saturating_sub(half);
+                            *list_state.offset_mut() = new_offset;
+                        }
+                    }
                     KeyCode::Char('R') => {
                         // Refresh — just re-render on next loop iteration
                     }
@@ -398,13 +417,15 @@ fn render_item<'a>(item: &'a Item, seen: &HashSet<String>, term_width: u16) -> L
         Style::default().fg(Color::Red).bold()
     };
 
+    let number = item.url.rsplit('/').next().unwrap_or("");
+    let type_and_num = format!("{} #{:<5}", type_label, number);
     let title_truncated: String = item.title.chars().take(50).collect();
 
     let line1 = Line::from(vec![
         Span::styled(indicator, indicator_style),
         Span::raw(" "),
-        Span::styled(type_label, Style::default().fg(Color::Blue)),
-        Span::raw("  "),
+        Span::styled(type_and_num, Style::default().fg(Color::Blue)),
+        Span::raw(" "),
         Span::styled(
             format!("{:<17}", repo_short),
             Style::default().fg(Color::Magenta),
