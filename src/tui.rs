@@ -326,16 +326,17 @@ fn run_tui_loop(
                         }
                     }
                     KeyCode::Char('z') => {
-                        // Centre the view on the current selection
+                        // Centre the view on the current selection.
+                        // Each list item takes ~4-5 terminal lines (title, meta,
+                        // summary, blank). Estimate visible items from terminal height.
                         if let Some(idx) = list_state.selected() {
-                            // Each item takes multiple lines; estimate visible rows
-                            // by using the list area height (chunks[2] from layout).
-                            // We approximate with terminal height minus header (2 lines + border).
-                            let visible = terminal
+                            let term_lines = terminal
                                 .size()
                                 .map(|s| s.height.saturating_sub(4) as usize)
                                 .unwrap_or(20);
-                            let half = visible / 2;
+                            let lines_per_item = 5;
+                            let visible_items = term_lines / lines_per_item;
+                            let half = visible_items / 2;
                             let new_offset = idx.saturating_sub(half);
                             *list_state.offset_mut() = new_offset;
                         }
