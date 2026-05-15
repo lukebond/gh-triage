@@ -109,10 +109,23 @@ fn run_tui_loop(
                     .split(area);
 
                 // Header
+                let position = list_state
+                    .selected()
+                    .and_then(|idx| rows.get(idx))
+                    .and_then(|row| match row {
+                        Row::Item(i) => Some(i + 1),
+                        Row::Header(_) => None,
+                    });
+                let count_label = match position {
+                    Some(pos) if item_count > 0 => {
+                        format!("[{status_label}: {pos}/{item_count}]")
+                    }
+                    _ => format!("[{status_label}: {item_count}]"),
+                };
                 let header = Paragraph::new(Line::from(vec![
                     Span::styled("gh-triage", Style::default().fg(Color::Green).bold()),
                     Span::raw(format!(
-                        "          [{status_label}: {item_count}]    ? help    q quit"
+                        "          {count_label}    ? help    q quit"
                     )),
                 ]));
                 frame.render_widget(header, chunks[0]);
